@@ -1,7 +1,11 @@
-use std::io::{Read, Write};
+use std::io::{self, Read, Write};
 use std::iter::Iterator;
+use std::net::SocketAddr;
 
-pub trait Conn: Read + Write {}
+pub trait Conn: Read + Write {
+    fn local_addr(&self) -> io::Result<SocketAddr>;
+    fn remote_addr(&self) -> io::Result<SocketAddr>;
+}
 
 pub trait Listener {
     type C: Conn;

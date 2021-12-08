@@ -1,7 +1,7 @@
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use crate::errors::Error;
+use crate::errors::{Error, Result};
 use crate::transport::Conn;
 use crate::{Request, Response};
 
@@ -17,11 +17,15 @@ where
         Self { conn }
     }
 
-    pub fn do_request<S, R>(&mut self, request: &Request<S>) -> Result<R, Error>
+    pub fn do_request<S, R>(&mut self, request: &Request<S>) -> Result<R>
     where
         S: Serialize,
         R: DeserializeOwned,
     {
+        if request.id.is_none() {
+            return Err(Error::invalid_params().wrap("non-notification must have id"));
+        }
+
         let request_json = serde_json::to_vec(request)?;
         self.conn.write_all(&request_json)?;
 
@@ -34,5 +38,19 @@ where
             Some(v) => Ok(v),
             None => Err(reply.error.unwrap()),
         }
+    }
+
+    pub fn notify<S>(&mut self, request: &Request<S>) -> Result<()>
+    where
+        S: Serialize,
+    {
+        if request.id.is_some() {
+            return Err(Error::invalid_params().wrap("notification takes no id"));
+        }
+
+        let request_json = serde_json::to_vec(request)?;
+        self.conn.write_all(&request_json)?;
+
+        Ok(())
     }
 }

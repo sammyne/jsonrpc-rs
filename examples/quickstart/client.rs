@@ -13,7 +13,7 @@ pub struct Request {
     pub msg: String,
 }
 
-fn main() {
+fn do_request() {
     let mut c = {
         let conn = tcp::dial("127.0.0.1:9123").unwrap();
         Client::new(conn)
@@ -26,5 +26,36 @@ fn main() {
     let request = jsonrpc::Request::new("service.hello_world", params, id);
 
     let reply: Reply = c.do_request(&request).unwrap();
-    println!("reply = {}", reply.msg);
+    println!("call method 'hello_world': reply = {}", reply.msg);
+}
+
+fn notify() {
+    let mut c = {
+        let conn = tcp::dial("127.0.0.1:9123").unwrap();
+        Client::new(conn)
+    };
+
+    let params = Request {
+        msg: "you're late".to_string(),
+    };
+
+    let request = jsonrpc::Request::new("service.notify", params, None);
+    match c.notify(&request) {
+        Ok(_) => {}
+        Err(err) => {
+            println!("   code = {}", err.code);
+            println!("message = {}", err.message);
+
+            let data_ref = err.data.unwrap();
+            let data = String::from_utf8_lossy(&data_ref);
+            println!("   data = {}", data);
+
+            unreachable!();
+        }
+    }
+}
+
+fn main() {
+    do_request();
+    notify();
 }

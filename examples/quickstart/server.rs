@@ -1,6 +1,6 @@
 use jsonrpc::server::Server;
 use jsonrpc::transport::tcp::TCPListener;
-use jsonrpc::{self, rpcize, Error, Metadata};
+use jsonrpc::{self, rpcize, Metadata, Result};
 use serde::{Deserialize, Serialize};
 
 pub struct HelloWorld {}
@@ -16,7 +16,7 @@ pub struct Reply {
 }
 
 impl HelloWorld {
-    pub fn hello_world(&mut self, request: Request, metadata: &Metadata) -> Result<Reply, Error> {
+    pub fn hello_world(&mut self, request: Request, metadata: &Metadata) -> Result<Reply> {
         println!(
             "hello_world is called with id = {}",
             metadata.id.as_ref().unwrap()
@@ -28,12 +28,20 @@ impl HelloWorld {
         Ok(reply)
     }
 
+    pub fn notify(&mut self, request: Request, _metadata: &Metadata) -> Result<()> {
+        println!(
+            "notification with msg='{}' will feedback no reply",
+            request.msg
+        );
+        Ok(())
+    }
+
     pub fn new() -> Self {
         Self {}
     }
 }
 
-rpcize!(HelloWorld: hello_world);
+rpcize!(HelloWorld: hello_world, notify);
 
 fn main() {
     let mut s = Server::new();

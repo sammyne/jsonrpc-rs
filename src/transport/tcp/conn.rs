@@ -5,7 +5,15 @@ use crate::transport::Conn;
 
 pub struct TCPConn(pub(crate) TcpStream);
 
-impl Conn for TCPConn {}
+impl Conn for TCPConn {
+    fn local_addr(&self) -> io::Result<std::net::SocketAddr> {
+        self.0.local_addr()
+    }
+
+    fn remote_addr(&self) -> io::Result<std::net::SocketAddr> {
+        self.0.peer_addr()
+    }
+}
 
 impl Read for TCPConn {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
