@@ -1,25 +1,7 @@
-use jsonrpc;
-use jsonrpc::errors::Error;
-use jsonrpc::server::{Server, Service};
+use jsonrpc::server::Server;
 use jsonrpc::transport::tcp::Transport;
+use jsonrpc::{self, rpcize, Error, Metadata};
 use serde::{Deserialize, Serialize};
-
-pub trait HelloWorldService {
-    fn hello_world(request: Request) -> Result<Reply, Error>;
-}
-
-impl<T> Service for T
-where
-    T: HelloWorldService,
-{
-    fn do_request(
-        &mut self,
-        method: &str,
-        params: serde_json::Value,
-    ) -> Result<serde_json::Value, Error> {
-        todo!()
-    }
-}
 
 pub struct HelloWorld {}
 
@@ -33,25 +15,12 @@ pub struct Reply {
     pub msg: String,
 }
 
-impl Service for HelloWorld {
-    fn do_request(
-        &mut self,
-        method: &str,
-        params: serde_json::Value,
-    ) -> Result<serde_json::Value, Error> {
-        match method {
-            "hello_world" => {
-                let request: Request = serde_json::from_value(params)?;
-                let reply = self.hello_world(&request)?;
-                serde_json::to_value(&reply).map_err(Error::from)
-            }
-            _ => Err(Error::method_not_found()),
-        }
-    }
-}
-
 impl HelloWorld {
-    pub fn hello_world(&self, request: &Request) -> Result<Reply, Error> {
+    pub fn hello_world(&mut self, request: Request, metadata: &Metadata) -> Result<Reply, Error> {
+        println!(
+            "hello_world is called with id = {}",
+            metadata.id.as_ref().unwrap()
+        );
         let reply = Reply {
             msg: format!("{} world", request.msg),
         };
@@ -63,6 +32,8 @@ impl HelloWorld {
         Self {}
     }
 }
+
+rpcize!(HelloWorld: hello_world);
 
 fn main() {
     let t = Transport::new("127.0.0.1:9123").unwrap();
