@@ -92,6 +92,14 @@ where
 
     let status = service.do_request(method_name, request.params, &metadata);
     if is_notification {
+        if let Err(err) = status {
+            log::warn!(
+                "notify with method '{}' failed, err={:?}",
+                request.method,
+                err
+            );
+        }
+
         return Ok(()); // drop response for notification
     }
 
