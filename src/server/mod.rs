@@ -54,10 +54,6 @@ impl Server {
             }
         }
     }
-
-    //pub fn stop() -> std::result::Result<(), String> {
-    //    todo!()
-    //}
 }
 
 fn handle_request<C>(
