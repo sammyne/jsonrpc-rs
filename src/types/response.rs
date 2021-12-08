@@ -8,7 +8,7 @@ pub struct Response<T> {
 
     pub result: Option<T>,
     pub error: Option<Error>,
-    pub id: Option<String>,
+    pub id: String,
 }
 
 impl<'de, T> Response<T>
@@ -19,7 +19,7 @@ where
         &self.jsonrpc
     }
 
-    pub fn new_err(error: Error, id: Option<String>) -> Self {
+    pub fn new_err(error: Error, id: String) -> Self {
         Self {
             jsonrpc: "2.0".to_string(),
             result: None,
@@ -27,7 +27,7 @@ where
             id,
         }
     }
-    pub fn new_ok(result: T, id: Option<String>) -> Self {
+    pub fn new_ok(result: T, id: String) -> Self {
         Self {
             jsonrpc: "2.0".to_string(),
             result: Some(result),

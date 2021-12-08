@@ -1,3 +1,7 @@
+pub struct Metadata {
+    pub id: Option<String>,
+}
+
 mod request;
 mod response;
 

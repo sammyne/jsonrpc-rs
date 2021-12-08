@@ -9,6 +9,8 @@ pub struct Error {
     pub data: Option<Vec<u8>>,
 }
 
+pub type Result<T> = std::result::Result<T, Error>;
+
 impl Error {
     pub fn internal_error() -> Self {
         Self::new_reserved(-32603, "Internal error", None)
@@ -40,6 +42,13 @@ impl Error {
 
     pub fn parse_error() -> Self {
         Self::new_reserved(-32700, "Parse error", None)
+    }
+
+    pub fn wrap(self, msg: &str) -> Self {
+        let mut out = self;
+        out.message = format!("{}\n  -> {}", msg, &out.message);
+
+        out
     }
 
     fn new_reserved(code: i32, message: &'static str, data: Option<Vec<u8>>) -> Self {

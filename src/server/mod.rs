@@ -2,11 +2,9 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::io::{self, ErrorKind, Read, Write};
 
-use crate::errors::Error;
+use crate::errors::Result;
 use crate::transport::Transport;
-use crate::{Request, Response};
-
-pub type HandleFunc = dyn Fn(Value) -> Result<Value, Error>;
+use crate::{Metadata, Request, Response};
 
 pub struct Server<T>
 where
@@ -17,7 +15,7 @@ where
 }
 
 pub trait Service {
-    fn do_request(&mut self, method: &str, params: Value) -> Result<Value, Error>;
+    fn do_request(&mut self, method: &str, params: Value, metadata: &Metadata) -> Result<Value>;
 }
 
 impl<T> Server<T>
@@ -35,7 +33,7 @@ where
         &mut self,
         name: &str,
         service: Box<dyn Service>,
-    ) -> Result<(), String> {
+    ) -> std::result::Result<(), String> {
         if self.services.contains_key(name) {
             return Err("name is occupied".to_string());
         }
@@ -44,7 +42,7 @@ where
         Ok(())
     }
 
-    pub fn serve(&mut self) -> Result<(), io::Error> {
+    pub fn serve(&mut self) -> std::result::Result<(), io::Error> {
         for v in self.transport.connections() {
             let mut conn = Box::new(v?);
 
@@ -72,12 +70,27 @@ where
                 }
             };
 
-            let feedback = match service.do_request(method_name, request.params) {
-                Ok(v) => {
-                    let reply = Response::new_ok(v, request.id);
-                    serde_json::to_vec(&reply).expect("fail to marshal response")
+            let metadata = Metadata { id: request.id };
+            let is_notification = metadata.id.is_none();
+
+            let status = service.do_request(method_name, request.params, &metadata);
+            if is_notification {
+                continue; // drop response for notification
+            }
+
+            let id = metadata.id.unwrap();
+            let feedback = {
+                let feedback = status.map_or_else(
+                    |err| Response::new_err(err, id.clone()),
+                    |ok| Response::new_ok(ok, id.clone()),
+                );
+                match serde_json::to_vec(&feedback) {
+                    Ok(v) => v,
+                    Err(err) => {
+                        println!("marshal response: {}", err);
+                        continue;
+                    }
                 }
-                Err(err) => serde_json::to_vec(&err).expect("fail to marshal error"),
             };
 
             conn.write_all(&feedback)?;
@@ -86,7 +99,7 @@ where
         unreachable!();
     }
 
-    pub fn stop() -> Result<(), String> {
+    pub fn stop() -> std::result::Result<(), String> {
         todo!()
     }
 }

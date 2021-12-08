@@ -4,6 +4,23 @@ use jsonrpc::server::{Server, Service};
 use jsonrpc::transport::tcp::Transport;
 use serde::{Deserialize, Serialize};
 
+pub trait HelloWorldService {
+    fn hello_world(request: Request) -> Result<Reply, Error>;
+}
+
+impl<T> Service for T
+where
+    T: HelloWorldService,
+{
+    fn do_request(
+        &mut self,
+        method: &str,
+        params: serde_json::Value,
+    ) -> Result<serde_json::Value, Error> {
+        todo!()
+    }
+}
+
 pub struct HelloWorld {}
 
 #[derive(Deserialize, Serialize)]
