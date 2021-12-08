@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::io;
 
 use serde_json::Value;
@@ -48,7 +49,11 @@ impl Server {
             let mut c = Channel::new(listener.accept()?);
             loop {
                 if let Err(err) = handle_request(&mut c, &mut self.services) {
-                    log::error!("fail to handle request: {:?}", err);
+                    if is_conn_closed_err(&err) {
+                        log::debug!("conn has been closed");
+                    } else {
+                        log::warn!("fail to handle request: {:?}", err);
+                    }
                     break;
                 }
             }
@@ -56,16 +61,28 @@ impl Server {
     }
 }
 
+fn feedback_err<C>(c: &mut Channel<C>, err: Error) -> io::Result<()>
+where
+    C: Conn,
+{
+    let r = Response::<Value>::new_err(err);
+    c.send_msg(&r)
+}
+
 fn handle_request<C>(
     c: &mut Channel<C>,
     services: &mut HashMap<String, Box<dyn Service>>,
-) -> Result<()>
+) -> io::Result<()>
 where
     C: Conn,
 {
     let request: Request<Value> = match c.recv_msg() {
         Ok(v) => v,
-        Err(err) => return feedback_err(c, err).map_err(|err| err.wrap("parse request")),
+        Err(err) if is_conn_closed_err(&err) => return Err(err),
+        Err(err) => {
+            return feedback_err(c, Error::from(err))
+                .map_err(|err| wrap_io_error(err, "parse request"))
+        }
     };
 
     // TODO: validate fields
@@ -75,15 +92,14 @@ where
         Some(v) => v,
         None => {
             let err = Error::method_not_found().wrap("method name must be '{service}.{method}'");
-            return feedback_err(c, err).map_err(|err| err.wrap("split service and method"));
+            return feedback_err(c, err);
         }
     };
 
     let service = match services.get_mut(service_name) {
         Some(v) => v,
         None => {
-            let hint = format!("service={}", service_name);
-            return feedback_err(c, Error::method_not_found()).map_err(|err| err.wrap(&hint));
+            return feedback_err(c, Error::method_not_found());
         }
     };
 
@@ -108,13 +124,19 @@ where
     });
 
     c.send_msg(&reply)
-        .map_err(|err| err.wrap("feedback response"))
+        .map_err(|err| wrap_io_error(err, "feedback reply"))
 }
 
-fn feedback_err<C>(c: &mut Channel<C>, err: Error) -> Result<()>
+fn is_conn_closed_err(err: &io::Error) -> bool {
+    match err.kind() {
+        io::ErrorKind::UnexpectedEof => true,
+        _ => false,
+    }
+}
+
+fn wrap_io_error<T>(err: io::Error, msg: T) -> io::Error
 where
-    C: Conn,
+    T: ToString + Display,
 {
-    let r = Response::<Value>::new_err(err);
-    c.send_msg(&r)
+    io::Error::new(err.kind(), format!("{} -> {}", msg, err))
 }
