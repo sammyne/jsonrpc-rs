@@ -46,12 +46,6 @@ fn parse_callback_mapping(raw: &str) -> Result<TokenStream, String> {
         }
     };
 
-    //let patterns = tokens.next().ok_or_else(|| "miss patterns".to_string())?;
-    //let actions = tokens
-    //    .next()
-    //    .map(|v| v.trim())
-    //    .ok_or_else(|| "miss method".to_string())?;
-
     let patterns = syn::parse_str::<Expr>(&patterns).map_err(|v| v.to_string())?;
     let actions = syn::parse_str::<Ident>(actions).map_err(|v| v.to_string())?;
 
@@ -76,7 +70,7 @@ fn must_generate_derive_code(type_: Ident, callbacks: &[TokenStream]) -> TokenSt
             fn do_request(&mut self, method: &str, params: serde_json::Value, metadata: &jsonrpc::Metadata) -> jsonrpc::Result<serde_json::Value> {
                 match method {
                     #(#callbacks)*
-                    _ => todo!(),
+                    _ => Err(jsonrpc::Error::method_not_found()),
                 }
             }
         }
