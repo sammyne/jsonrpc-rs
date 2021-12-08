@@ -38,10 +38,8 @@ impl Server {
     where
         L: Listener,
     {
-        let mut listener = listener;
-
-        for v in listener.connections() {
-            let mut conn = Box::new(v?);
+        loop {
+            let mut conn = listener.accept()?;
 
             let mut request_json = vec![];
             let _ = conn.read_to_end(&mut request_json)?;
@@ -92,8 +90,6 @@ impl Server {
 
             conn.write_all(&feedback)?;
         }
-
-        unreachable!();
     }
 
     pub fn stop() -> std::result::Result<(), String> {
