@@ -1,6 +1,7 @@
-use serde_json::Value;
 use std::collections::HashMap;
 use std::io;
+
+use serde_json::Value;
 
 use crate::errors::{Error, Result};
 use crate::transport::Conn;
@@ -47,7 +48,7 @@ impl Server {
             let mut c = Channel::new(listener.accept()?);
             loop {
                 if let Err(err) = handle_request(&mut c, &mut self.services) {
-                    println!("fail to handle request: {:?}", err);
+                    log::error!("fail to handle request: {:?}", err);
                     break;
                 }
             }

@@ -1,3 +1,6 @@
+//#[macro_use]
+//extern crate log;
+
 use jsonrpc::server::Server;
 use jsonrpc::transport::tcp::TCPListener;
 use jsonrpc::{self, rpcize, Metadata, Result};
@@ -44,6 +47,10 @@ impl HelloWorld {
 rpcize!(HelloWorld: hello_world, notify);
 
 fn main() {
+    std::env::set_var("RUST_LOG", "info");
+
+    env_logger::init();
+
     let mut s = Server::new();
 
     let hello_world = HelloWorld::new();
@@ -52,5 +59,6 @@ fn main() {
 
     let t = TCPListener::new("127.0.0.1:9123").unwrap();
 
+    log::info!("server is up :)");
     s.serve(t).unwrap();
 }
