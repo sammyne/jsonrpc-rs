@@ -36,13 +36,13 @@ impl HelloWorld {
 rpcize!(HelloWorld: hello_world);
 
 fn main() {
-    let t = TCPListener::new("127.0.0.1:9123").unwrap();
-
-    let mut s = Server::new(t);
+    let mut s = Server::new();
 
     let hello_world = HelloWorld::new();
     s.register_service("service", Box::new(hello_world))
         .unwrap();
 
-    s.serve().unwrap();
+    let t = TCPListener::new("127.0.0.1:9123").unwrap();
+
+    s.serve(t).unwrap();
 }

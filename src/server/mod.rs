@@ -6,11 +6,7 @@ use crate::errors::Result;
 use crate::transport::Listener;
 use crate::{Metadata, Request, Response};
 
-pub struct Server<T>
-where
-    T: Listener,
-{
-    Listener: T,
+pub struct Server {
     services: HashMap<String, Box<dyn Service>>,
 }
 
@@ -18,13 +14,9 @@ pub trait Service {
     fn do_request(&mut self, method: &str, params: Value, metadata: &Metadata) -> Result<Value>;
 }
 
-impl<T> Server<T>
-where
-    T: Listener,
-{
-    pub fn new(Listener: T) -> Self {
+impl Server {
+    pub fn new() -> Self {
         Self {
-            Listener,
             services: HashMap::new(),
         }
     }
@@ -42,8 +34,13 @@ where
         Ok(())
     }
 
-    pub fn serve(&mut self) -> std::result::Result<(), io::Error> {
-        for v in self.Listener.connections() {
+    pub fn serve<L>(&mut self, listener: L) -> std::result::Result<(), io::Error>
+    where
+        L: Listener,
+    {
+        let mut listener = listener;
+
+        for v in listener.connections() {
             let mut conn = Box::new(v?);
 
             let mut request_json = vec![];
