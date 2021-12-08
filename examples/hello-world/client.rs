@@ -15,7 +15,7 @@ pub struct Request {
 
 fn main() {
     let mut c = {
-        let conn = tcp::new_connection("127.0.0.1:9123").unwrap();
+        let conn = tcp::dial("127.0.0.1:9123").unwrap();
         Client::new(conn)
     };
 

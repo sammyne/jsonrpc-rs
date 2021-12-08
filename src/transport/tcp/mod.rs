@@ -2,7 +2,7 @@ use std::io::{self, Read, Write};
 use std::iter::Iterator;
 use std::net::{TcpListener, TcpStream, ToSocketAddrs};
 
-use crate::transport::Connection;
+use crate::transport::Conn;
 
 pub struct LengthPrefixReadWriter {
     conn: TcpStream,
@@ -29,7 +29,7 @@ impl Read for LengthPrefixReadWriter {
     }
 }
 
-impl Connection for LengthPrefixReadWriter {}
+impl Conn for LengthPrefixReadWriter {}
 
 impl Write for LengthPrefixReadWriter {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
@@ -59,9 +59,9 @@ impl Transport {
 }
 
 impl crate::transport::Transport for Transport {
-    type Conn = LengthPrefixReadWriter;
+    type C = LengthPrefixReadWriter;
 
-    fn connections(&mut self) -> Box<dyn Iterator<Item = std::io::Result<Self::Conn>> + '_> {
+    fn connections(&mut self) -> Box<dyn Iterator<Item = std::io::Result<Self::C>> + '_> {
         Box::new(
             self.listener
                 .incoming()
@@ -70,7 +70,7 @@ impl crate::transport::Transport for Transport {
     }
 }
 
-pub fn new_connection<A>(addr: A) -> Result<LengthPrefixReadWriter, io::Error>
+pub fn dial<A>(addr: A) -> Result<LengthPrefixReadWriter, io::Error>
 where
     A: ToSocketAddrs,
 {

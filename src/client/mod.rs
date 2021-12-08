@@ -2,7 +2,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use crate::errors::Error;
-use crate::transport::Connection;
+use crate::transport::Conn;
 use crate::{Request, Response};
 
 pub struct Client<T> {
@@ -11,7 +11,7 @@ pub struct Client<T> {
 
 impl<T> Client<T>
 where
-    T: Connection,
+    T: Conn,
 {
     pub fn new(conn: T) -> Self {
         Self { conn }
