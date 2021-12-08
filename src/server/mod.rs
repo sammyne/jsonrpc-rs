@@ -1,8 +1,9 @@
 use serde_json::Value;
 use std::collections::HashMap;
-use std::io::{self, ErrorKind, Read, Write};
+use std::io;
 
-use crate::errors::Result;
+use crate::errors::{Error, Result};
+use crate::transport::Conn;
 use crate::transport::Listener;
 use crate::{Metadata, Request, Response};
 
@@ -41,58 +42,80 @@ impl Server {
         loop {
             let mut conn = listener.accept()?;
 
-            let mut request_json = vec![];
-            let _ = conn.read_to_end(&mut request_json)?;
-
-            let request: Request<Value> = serde_json::from_slice(request_json.as_slice())?;
-
-            // TODO: validate fields
-
-            // find method
-            let (service_name, method_name) = match request.method.as_str().split_once('.') {
-                Some(v) => v,
-                None => {
-                    // TODO: feedback error
-                    return Err(io::Error::new(ErrorKind::NotFound, "bad method name"));
+            loop {
+                if let Err(err) = handle_request(&mut conn, &mut self.services) {
+                    println!("fail to handle request: {:?}", err);
+                    break;
                 }
-            };
-
-            let service = match self.services.get_mut(service_name) {
-                Some(v) => v,
-                None => {
-                    // TODO: feedback error
-                    return Err(io::Error::new(ErrorKind::NotFound, "method not found"));
-                }
-            };
-
-            let metadata = Metadata { id: request.id };
-            let is_notification = metadata.id.is_none();
-
-            let status = service.do_request(method_name, request.params, &metadata);
-            if is_notification {
-                continue; // drop response for notification
             }
-
-            let id = metadata.id.unwrap();
-            let feedback = {
-                let feedback = status.map_or_else(
-                    |err| Response::new_err(err, id.clone()),
-                    |ok| Response::new_ok(ok, id.clone()),
-                );
-                match serde_json::to_vec(&feedback) {
-                    Ok(v) => v,
-                    Err(err) => {
-                        println!("marshal response: {}", err);
-                        continue;
-                    }
-                }
-            };
-
-            conn.write_all(&feedback)?;
         }
     }
 
-    pub fn stop() -> std::result::Result<(), String> {
-        todo!()
+    //pub fn stop() -> std::result::Result<(), String> {
+    //    todo!()
+    //}
+}
+
+fn handle_request<C>(conn: &mut C, services: &mut HashMap<String, Box<dyn Service>>) -> Result<()>
+where
+    C: Conn,
+{
+    let mut request_json = vec![];
+    let _ = conn.read_to_end(&mut request_json)?;
+
+    let request: Request<Value> =
+        match serde_json::from_slice(request_json.as_slice()).map_err(Error::from) {
+            Ok(v) => v,
+            Err(err) => return feedback_err(conn, err).map_err(|err| err.wrap("parse request")),
+        };
+
+    // TODO: validate fields
+
+    // find method
+    let (service_name, method_name) = match request.method.as_str().split_once('.') {
+        Some(v) => v,
+        None => {
+            let err = Error::method_not_found().wrap("method name must be '{service}.{method}'");
+            return feedback_err(conn, err).map_err(|err| err.wrap("split service and method"));
+        }
+    };
+
+    let service = match services.get_mut(service_name) {
+        Some(v) => v,
+        None => {
+            let hint = format!("service={}", service_name);
+            return feedback_err(conn, Error::method_not_found()).map_err(|err| err.wrap(&hint));
+        }
+    };
+
+    let metadata = Metadata { id: request.id };
+    let is_notification = metadata.id.is_none();
+
+    let status = service.do_request(method_name, request.params, &metadata);
+    if is_notification {
+        return Ok(()); // drop response for notification
     }
+
+    let reply = status.map_or_else(
+        |err| Response::new_err(err),
+        |ok| Response::new_ok(ok, metadata.id.unwrap()),
+    );
+
+    feedback_reply(conn, reply).map_err(|err| err.wrap("feedback response"))
+}
+
+fn feedback_err<T>(conn: &mut T, err: Error) -> Result<()>
+where
+    T: Conn,
+{
+    let r = Response::<Value>::new_err(err);
+    feedback_reply(conn, r)
+}
+
+fn feedback_reply<T>(conn: &mut T, r: Response<Value>) -> Result<()>
+where
+    T: Conn,
+{
+    let reply_json = serde_json::to_vec(&r).map_err(Error::from)?;
+    conn.write_all(&reply_json).map_err(Error::from)
 }
