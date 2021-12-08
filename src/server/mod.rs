@@ -3,14 +3,14 @@ use std::collections::HashMap;
 use std::io::{self, ErrorKind, Read, Write};
 
 use crate::errors::Result;
-use crate::transport::Transport;
+use crate::transport::Listener;
 use crate::{Metadata, Request, Response};
 
 pub struct Server<T>
 where
-    T: Transport,
+    T: Listener,
 {
-    transport: T,
+    Listener: T,
     services: HashMap<String, Box<dyn Service>>,
 }
 
@@ -20,11 +20,11 @@ pub trait Service {
 
 impl<T> Server<T>
 where
-    T: Transport,
+    T: Listener,
 {
-    pub fn new(transport: T) -> Self {
+    pub fn new(Listener: T) -> Self {
         Self {
-            transport,
+            Listener,
             services: HashMap::new(),
         }
     }
@@ -43,7 +43,7 @@ where
     }
 
     pub fn serve(&mut self) -> std::result::Result<(), io::Error> {
-        for v in self.transport.connections() {
+        for v in self.Listener.connections() {
             let mut conn = Box::new(v?);
 
             let mut request_json = vec![];

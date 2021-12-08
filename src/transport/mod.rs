@@ -3,7 +3,7 @@ use std::iter::Iterator;
 
 pub trait Conn: Read + Write {}
 
-pub trait Transport {
+pub trait Listener {
     type C: Conn;
 
     fn connections(&mut self) -> Box<dyn Iterator<Item = std::io::Result<Self::C>> + '_>;

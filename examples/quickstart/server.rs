@@ -1,5 +1,5 @@
 use jsonrpc::server::Server;
-use jsonrpc::transport::tcp::Transport;
+use jsonrpc::transport::tcp::TCPListener;
 use jsonrpc::{self, rpcize, Error, Metadata};
 use serde::{Deserialize, Serialize};
 
@@ -36,7 +36,7 @@ impl HelloWorld {
 rpcize!(HelloWorld: hello_world);
 
 fn main() {
-    let t = Transport::new("127.0.0.1:9123").unwrap();
+    let t = TCPListener::new("127.0.0.1:9123").unwrap();
 
     let mut s = Server::new(t);
 
