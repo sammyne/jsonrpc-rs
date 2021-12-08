@@ -6,12 +6,12 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [[example]]
-name = "hello-world-client"
-path = "examples/hello-world/client.rs"
+name = "quickstart-client"
+path = "examples/quickstart/client.rs"
 
 [[example]]
-name = "hello-world-server"
-path = "examples/hello-world/server.rs"
+name = "quickstart-server"
+path = "examples/quickstart/server.rs"
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
