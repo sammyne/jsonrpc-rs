@@ -50,7 +50,7 @@ impl Server {
             loop {
                 if let Err(err) = handle_request(&mut c, &mut self.services) {
                     if is_conn_closed_err(&err) {
-                        log::debug!("conn has been closed");
+                        log::debug!("a conn has been served");
                     } else {
                         log::warn!("fail to handle request: {:?}", err);
                     }
