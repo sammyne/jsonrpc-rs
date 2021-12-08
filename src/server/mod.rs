@@ -7,6 +7,10 @@ use crate::transport::Conn;
 use crate::transport::Listener;
 use crate::{Metadata, Request, Response};
 
+mod channel;
+
+use channel::Channel;
+
 pub struct Server {
     services: HashMap<String, Box<dyn Service>>,
 }
@@ -40,10 +44,9 @@ impl Server {
         L: Listener,
     {
         loop {
-            let mut conn = listener.accept()?;
-
+            let mut c = Channel::new(listener.accept()?);
             loop {
-                if let Err(err) = handle_request(&mut conn, &mut self.services) {
+                if let Err(err) = handle_request(&mut c, &mut self.services) {
                     println!("fail to handle request: {:?}", err);
                     break;
                 }
@@ -56,18 +59,17 @@ impl Server {
     //}
 }
 
-fn handle_request<C>(conn: &mut C, services: &mut HashMap<String, Box<dyn Service>>) -> Result<()>
+fn handle_request<C>(
+    c: &mut Channel<C>,
+    services: &mut HashMap<String, Box<dyn Service>>,
+) -> Result<()>
 where
     C: Conn,
 {
-    let mut request_json = vec![];
-    let _ = conn.read_to_end(&mut request_json)?;
-
-    let request: Request<Value> =
-        match serde_json::from_slice(request_json.as_slice()).map_err(Error::from) {
-            Ok(v) => v,
-            Err(err) => return feedback_err(conn, err).map_err(|err| err.wrap("parse request")),
-        };
+    let request: Request<Value> = match c.recv_msg() {
+        Ok(v) => v,
+        Err(err) => return feedback_err(c, err).map_err(|err| err.wrap("parse request")),
+    };
 
     // TODO: validate fields
 
@@ -76,7 +78,7 @@ where
         Some(v) => v,
         None => {
             let err = Error::method_not_found().wrap("method name must be '{service}.{method}'");
-            return feedback_err(conn, err).map_err(|err| err.wrap("split service and method"));
+            return feedback_err(c, err).map_err(|err| err.wrap("split service and method"));
         }
     };
 
@@ -84,7 +86,7 @@ where
         Some(v) => v,
         None => {
             let hint = format!("service={}", service_name);
-            return feedback_err(conn, Error::method_not_found()).map_err(|err| err.wrap(&hint));
+            return feedback_err(c, Error::method_not_found()).map_err(|err| err.wrap(&hint));
         }
     };
 
@@ -96,26 +98,18 @@ where
         return Ok(()); // drop response for notification
     }
 
-    let reply = status.map_or_else(
-        |err| Response::new_err(err),
-        |ok| Response::new_ok(ok, metadata.id.unwrap()),
-    );
+    let reply = status.map_or_else(Response::new_err, |ok| {
+        Response::new_ok(ok, metadata.id.unwrap())
+    });
 
-    feedback_reply(conn, reply).map_err(|err| err.wrap("feedback response"))
+    c.send_msg(&reply)
+        .map_err(|err| err.wrap("feedback response"))
 }
 
-fn feedback_err<T>(conn: &mut T, err: Error) -> Result<()>
+fn feedback_err<C>(c: &mut Channel<C>, err: Error) -> Result<()>
 where
-    T: Conn,
+    C: Conn,
 {
     let r = Response::<Value>::new_err(err);
-    feedback_reply(conn, r)
-}
-
-fn feedback_reply<T>(conn: &mut T, r: Response<Value>) -> Result<()>
-where
-    T: Conn,
-{
-    let reply_json = serde_json::to_vec(&r).map_err(Error::from)?;
-    conn.write_all(&reply_json).map_err(Error::from)
+    c.send_msg(&r)
 }
