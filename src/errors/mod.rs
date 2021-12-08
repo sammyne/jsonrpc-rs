@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 pub struct Error {
     pub code: i32,
     pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<Vec<u8>>,
 }
 
@@ -62,17 +63,15 @@ impl Error {
 
 impl From<io::Error> for Error {
     fn from(err: io::Error) -> Self {
-        let mut out = Self::internal_error();
-        out.data = Some(err.to_string().as_bytes().to_vec());
-        out
+        let err_string = err.to_string();
+        Self::internal_error().wrap(&err_string)
     }
 }
 
 impl From<serde_json::error::Error> for Error {
     fn from(err: serde_json::error::Error) -> Self {
-        let mut out = Self::parse_error();
-        out.data = Some(err.to_string().as_bytes().to_vec());
-        out
+        let err_string = err.to_string();
+        Self::parse_error().wrap(&err_string)
     }
 }
 
